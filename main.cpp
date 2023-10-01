@@ -13,8 +13,10 @@ using namespace std;
 class Bird;
 const float PI = 3.1415;
 const float BIRDSCALE = 5.0;
-const int BIRDCOUNT = 10;
+const int BIRDCOUNT = 40;
+const float TURNING_SPEED = 0.5;
 const float FLOCKING_RANGE = 100.0;
+const float OBSTACLE_RANGE = 25.0;
 const float wallx0 = 50.0;
 const float wallx1 = 650.0;
 const float wally0 = 50.0;
@@ -22,9 +24,11 @@ const float wally1 = 650.0;
 int highestBirdId = 0;
 std::vector<Bird> birds; 
 void drawTriangle(float x, float y, float thetaRad);
+float distBetweenPoints(float ax, float ay, float bx, float by);
 float distBetweenBirds(Bird& a, Bird& b);
 void drawLineToNearestBird(Bird& bird);
 std::vector<Bird> createRandomBirds(int n);
+int indexOfMinimumFloatArray(float *arr);
 
 class Bird {
 private:
@@ -51,7 +55,7 @@ public:
 	}
 	void addRot (float num) { setRot(rot + num); }
 	void draw(){
-		glColor3f((360-rot)/360, rot/360, 0);
+		glColor3f(abs(180-rot)/360, rot/360, 0);
 		drawTriangle(x, y, rot);
 	}
 	void step(float distance){
@@ -99,9 +103,54 @@ public:
 	}
 	int getId() {return id;}
 	void steerAwayFromWall() {
-		
+		float distanceToWalls[] = {x - wallx0, wally1 - y, wallx1 - x, y - wally0}; // left, top, right, bottom
+		int shortestDistanceIndex = indexOfMinimumFloatArray(distanceToWalls);
+		if (distanceToWalls[shortestDistanceIndex] > OBSTACLE_RANGE) return;
+		switch (shortestDistanceIndex) { //find which wall is closest
+		//If my point is closer to the left vertex of this edge, turn right. Else turn left
+			case 0:
+				if (distBetweenPoints(x, y, wallx0, wally0) > distBetweenPoints(x, y, wallx0, wally1)){
+					addRot(TURNING_SPEED);
+				}
+				else {addRot(-TURNING_SPEED); }
+				break;
+			case 1:
+				if (distBetweenPoints(x, y, wallx0, wally1) > distBetweenPoints(x, y, wallx1, wally1)){
+					addRot(TURNING_SPEED);
+				}
+				else {addRot(-TURNING_SPEED); }
+				break;
+			case 2:
+				if (distBetweenPoints(x, y, wallx1, wally1) > distBetweenPoints(x, y, wallx1, wally0)){
+					addRot(TURNING_SPEED);
+				}
+				else {addRot(-TURNING_SPEED); }
+				break;
+			case 3:
+				if (distBetweenPoints(x, y, wallx1, wally0) > distBetweenPoints(x, y, wallx0, wally0)){
+					addRot(TURNING_SPEED);
+				}
+				else {addRot(-TURNING_SPEED); }
+				break;
+		}
 	}
 };
+
+int indexOfMinimumFloatArray(float *arr) {
+	int recordIndex = 0;
+	int recordMin = arr[0];
+	for (int i = 1; i < sizeof(*arr); i++) {
+		if (arr[i] < recordMin) {
+			recordMin = arr[i];
+			recordIndex = i;
+		}
+	}
+	return recordIndex;
+}
+
+float distBetweenPoints(float ax, float ay, float bx, float by) {
+	return sqrt(pow(bx - ax, 2) + pow(by - ay, 2));
+}
 
 float distBetweenBirds(Bird& a, Bird& b){ //I want this to be a pass by reference since im not modifing the birds at all, so I do not want to make copies of them
 	//distance between two points
@@ -148,13 +197,22 @@ void display() {
 		glVertex2f(wallx1, wally1);
 		glVertex2f(wallx0, wally1);
 	glEnd();
+	// SECTION LINES
+	glColor3f(0.2,0.2,0.2);
+	glBegin(GL_LINES);
+		glVertex2f(wallx0, wally0);
+		glVertex2f(wallx1, wally1);
+		glVertex2f(wallx0, wally1);
+		glVertex2f(wallx1, wally0);
+	glEnd();
 	// DRAW ALL BIRDS
 	for (int i = 0; i < size(birds); i++){
-		birds[i].step(1);
-		birds[i].findNearbyBirds();
-		birds[i].addRot(1);
+		birds[i].step(0.1);
+		//birds[i].findNearbyBirds();
+		birds[i].steerAwayFromWall();
+		//birds[i].addRot(1);
 		birds[i].draw();
-		drawLineToNearestBird(birds[i]);
+		//drawLineToNearestBird(birds[i]);
 	}
 	glutSwapBuffers();
 	GLenum error = glGetError();
