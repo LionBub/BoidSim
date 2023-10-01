@@ -1,34 +1,51 @@
+#include <cstddef>
 #include <iostream>
 #include <stdio.h>
 #include <GL/glut.h>
 #include <math.h>
 #include <cmath>
+#include <string>
 #include <vector>
 #include <random>
 
 //complie using $ g++ -o main main.cpp -lGL -lGLU -lglut -lm
 using namespace std;
+class Bird;
 const float PI = 3.1415;
-const float BIRDSCALE = 5;
+const float BIRDSCALE = 5.0;
+const int BIRDCOUNT = 10;
+const float FLOCKING_RANGE = 100.0;
+int highestBirdId = 0;
+std::vector<Bird> birds; 
 void drawTriangle(float x, float y, float thetaRad);
-
+float distBetweenBirds(Bird& a, Bird& b);
+void drawLineToNearestBird(Bird& bird);
+std::vector<Bird> createRandomBirds(int n);
 
 class Bird {
 private:
 	float x;
 	float y;
 	float rot;
+	int id;
+	std::vector<Bird*> nearbyBirds; /* i think this should hold pointers to save memory because 
+									I wont have multiple copies of birds in different places. All point back to the original birds vector 
+									What if I use Bird& references instead?!?!*/
 public:
 	Bird(float _x, float _y, float _rot) 
 		: x(_x), y(_y), rot(_rot) {
+			id = highestBirdId++;
 	}
 	float getx() {return x;}
 	void setx(float newx) {x = newx;}
 	float gety() {return y;}
 	void sety(float newy) {y = newy;}
 	float getRot() {return rot;}
-	void setRot(float newrot) { rot = newrot;}
-	void addRot (float num) { rot += num;}
+	void setRot(float newrot) { 
+		newrot = fmod(newrot, 360);
+		rot = newrot;
+	}
+	void addRot (float num) { setRot(rot + num); }
 	void draw(){
 		glColor3f((360-rot)/360, rot/360, 0);
 		drawTriangle(x, y, rot);
@@ -37,9 +54,63 @@ public:
 		x += distance * cos(rot * PI/180);//cos is in rad, rot is in degrees
 		y += distance * sin(rot * PI/180);
 	}
+	// Bird* pFindNearestBird(){ //NOT USED
+	// 	if (size(birds) > 1){
+	// 		int recordIndex;
+	// 		float recordDist;
+	// 		if (this != &birds[0]){
+	// 			recordIndex = 0;
+	// 			recordDist = distBetweenBirds(*this, birds[0]); //bird zero to bird 1
+	// 		}
+	// 		else { //If this is birds[0]
+	// 			std::cout << std::endl;
+	// 			recordIndex = 1;
+	// 			recordDist = distBetweenBirds(*this, birds[1]); //bird zero to bird 1
+	// 		}
+	// 		for(int i = 1; i < size(birds); i++){
+	// 			if (this == &birds[i]) continue;
+	// 			float thisDist = distBetweenBirds(*this, birds[i]);
+	// 			if (thisDist < recordDist) { 
+	// 				recordIndex = i;
+	// 				recordDist = thisDist; 
+	// 			}
+	// 		}
+	// 		return &birds[recordIndex];
+	// 		/* std::cout << "Bird " + std::to_string(getId()) + " to " + std::to_string(nearestBird -> getId())
+	// 			+"    at a distance of " + std::to_string(recordDist)<< std::endl; 
+	// 		*/
+	// 	}
+	// 	std::cout << "can't find nearby birds. Is there only one bird? findNearestBird() returned null" << std::endl;
+	// }
+	Bird* pGetNearestBird() { return nearbyBirds[0];}
+	void findNearbyBirds() {
+		for(int i = 0; i < size(birds); i++){
+			if(distBetweenBirds(*this, birds[i]) < FLOCKING_RANGE){
+				nearbyBirds.insert(nearbyBirds.begin(), &birds[i]);
+			}
+			else {
+				nearbyBirds.emplace_back(&birds[i]);
+			}
+		}
+	}
+	int getId() {return id;}
 };
 
-vector<Bird> createRandomBirds(int n) { //thanks chatgpt
+float distBetweenBirds(Bird& a, Bird& b){ //I want this to be a pass by reference since im not modifing the birds at all, so I do not want to make copies of them
+	//distance between two points
+	return sqrt(pow(b.getx() - a.getx(), 2) + pow(b.getx() - a.getx(),2));
+}
+
+void drawLineToNearestBird(Bird& bird){ //Passing by reference. SHOULD BRD BE A POINTER??!?!
+	glColor3f(0,0,1);
+	Bird* nearBrd = bird.pGetNearestBird();
+	glBegin(GL_LINES);
+	glVertex2f(bird.getx(), bird.gety());
+	glVertex2f(nearBrd -> getx(), nearBrd -> gety());
+	glEnd();
+}
+
+std::vector<Bird> createRandomBirds(int n) { //thanks chatgpt
 	vector<Bird> birds;
 	random_device rd;//this creates a more uniformly distributed randomness over 2d space.
 	mt19937 gen(rd()); //apparently also more suitable for multithreaded operations.
@@ -55,10 +126,6 @@ vector<Bird> createRandomBirds(int n) { //thanks chatgpt
 	}
 	return birds;
 }
-//MORE VARIABLES
-float spin = 0;
-vector<Bird> birds;
-
 
 void display() {
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -71,10 +138,13 @@ void display() {
 		glVertex2f(650, 650);
 		glVertex2f(50, 650);
 	glEnd();
+	// DRAW ALL BIRDS
 	for (int i = 0; i < size(birds); i++){
 		birds[i].step(1);
+		birds[i].findNearbyBirds();
 		birds[i].addRot(1);
 		birds[i].draw();
+		drawLineToNearestBird(birds[i]);
 	}
 	glutSwapBuffers();
 	GLenum error = glGetError();
@@ -84,11 +154,6 @@ void display() {
 }
 
 void update(){
-   spin = spin + 0.2;
-   if (spin > 360.0)
-      spin = spin - 360.0;
-     
-   
    glutPostRedisplay();
 }
 
@@ -111,7 +176,7 @@ void init(void)
    glClearColor (0.9, 0.9, 0.9, 1);
    glShadeModel (GL_FLAT);
    
-   birds = createRandomBirds(10);
+   birds = createRandomBirds(BIRDCOUNT);
 }
 
 void reshape(int w, int h)
@@ -122,7 +187,6 @@ void reshape(int w, int h)
    glOrtho(0, 700, 0, 700, -1, 1);
    glMatrixMode(GL_MODELVIEW);
    glLoadIdentity();
-   std::cout<<"reshape"<<std::endl;
 }
 
 int main(int argc, char** argv) {
