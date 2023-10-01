@@ -15,6 +15,10 @@ const float PI = 3.1415;
 const float BIRDSCALE = 5.0;
 const int BIRDCOUNT = 10;
 const float FLOCKING_RANGE = 100.0;
+const float wallx0 = 50.0;
+const float wallx1 = 650.0;
+const float wally0 = 50.0;
+const float wally1 = 650.0;
 int highestBirdId = 0;
 std::vector<Bird> birds; 
 void drawTriangle(float x, float y, float thetaRad);
@@ -94,6 +98,9 @@ public:
 		}
 	}
 	int getId() {return id;}
+	void steerAwayFromWall() {
+		
+	}
 };
 
 float distBetweenBirds(Bird& a, Bird& b){ //I want this to be a pass by reference since im not modifing the birds at all, so I do not want to make copies of them
@@ -114,8 +121,8 @@ std::vector<Bird> createRandomBirds(int n) { //thanks chatgpt
 	vector<Bird> birds;
 	random_device rd;//this creates a more uniformly distributed randomness over 2d space.
 	mt19937 gen(rd()); //apparently also more suitable for multithreaded operations.
-	uniform_real_distribution<float> xDist(50.f, 650.0f);
-	uniform_real_distribution<float> yDist(50.f, 650.0f);
+	uniform_real_distribution<float> xDist(wallx0, wallx1);
+	uniform_real_distribution<float> yDist(wally0, wally1);
 	uniform_real_distribution<float> rotDist(0.0f, 360.0f);
 	
 	for (int i = 0; i < n; ++i) {
@@ -127,16 +134,19 @@ std::vector<Bird> createRandomBirds(int n) { //thanks chatgpt
 	return birds;
 }
 
+
+
+
 void display() {
 	glClear(GL_COLOR_BUFFER_BIT);
 	// Your OpenGL drawing code goes here
 	//WHITE SQUARE
 	glColor3f(1,1,1);
 	glBegin(GL_POLYGON);
-		glVertex2f(50, 50);
-		glVertex2f(650, 50);
-		glVertex2f(650, 650);
-		glVertex2f(50, 650);
+		glVertex2f(wallx0, wally0);
+		glVertex2f(wallx1, wally0);
+		glVertex2f(wallx1, wally1);
+		glVertex2f(wallx0, wally1);
 	glEnd();
 	// DRAW ALL BIRDS
 	for (int i = 0; i < size(birds); i++){
@@ -156,8 +166,6 @@ void display() {
 void update(){
    glutPostRedisplay();
 }
-
-
 
 void drawTriangle(float x, float y, float thetaDeg){
 //isocoles, 20px long, 10px wide
