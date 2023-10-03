@@ -1,3 +1,5 @@
+#include <bits/types/struct_timespec.h>
+#include <bits/types/struct_timeval.h>
 #include <cstddef>
 #include <iostream>
 #include <stdio.h>
@@ -7,11 +9,13 @@
 #include <string>
 #include <vector>
 #include <random>
+#include <sys/time.h>
 
 //complie using $ g++ -o main main.cpp -lGL -lGLU -lglut -lm
 using namespace std;
 class Bird;
 const float PI = 3.1415;
+const int FPS_LIMIT = 30;
 const float BIRDSCALE = 5.0;
 const int BIRDCOUNT = 40;
 const float TURNING_SPEED = 0.5;
@@ -183,10 +187,44 @@ std::vector<Bird> createRandomBirds(int n) { //thanks chatgpt
 	return birds;
 }
 
+void WaitForEndOfFrame(){ //thanks chat gpt
+	struct timespec this_time, last_time, delta_time;
+	clock_gettime(CLOCK_MONOTONIC, &this_time);
+	if(last_time.tv_nsec == 0) { //Initialize last_time on the first call
+		last_time = this_time;
+	} 
+	else{
+		delta_time.tv_sec = this_time.tv_sec - last_time.tv_sec; //seconds
+		delta_time.tv_nsec = this_time.tv_nsec - last_time.tv_nsec; //nanoseconds
 
+		// Normalize delta_time to ensure the nanoseconds field is positive. 
+		//Used when subtracting. "borrowing" from the seconds place
+		if (delta_time.tv_nsec < 0) {
+			delta_time.tv_sec--;
+			delta_time.tv_nsec += 1000000000; //1 billion nanoseconds in a second
+		}
+	}
 
+	// Calculate the time to sleep to achieve the desired frame rate
+	const long NANOSECONDS_PER_SECOND = 1000000000;
+	const int timePerFrame = NANOSECONDS_PER_SECOND / FPS_LIMIT;
+	delta_time = this_time; // Reset delta_time to the current time
+	delta_time.tv_sec -= last_time.tv_sec;
+	delta_time.tv_nsec -= last_time.tv_nsec;
 
+	long timeToSleep = timePerFrame - (delta_time.tv_sec * NANOSECONDS_PER_SECOND + delta_time.tv_nsec);
+	if (timeToSleep > 0) {
+		struct timespec sleep_duration;
+		sleep_duration.tv_sec = timeToSleep / NANOSECONDS_PER_SECOND;
+		sleep_duration.tv_nsec = timeToSleep % NANOSECONDS_PER_SECOND;
+
+		//Sleep for the required duration
+		nanosleep(&sleep_duration, NULL);
+	}
+	last_time = this_time;
+}
 void display() {
+	
 	glClear(GL_COLOR_BUFFER_BIT);
 	// Your OpenGL drawing code goes here
 	//WHITE SQUARE
@@ -207,7 +245,7 @@ void display() {
 	glEnd();
 	// DRAW ALL BIRDS
 	for (int i = 0; i < size(birds); i++){
-		birds[i].step(0.1);
+		birds[i].step(3);
 		//birds[i].findNearbyBirds();
 		birds[i].steerAwayFromWall();
 		//birds[i].addRot(1);
@@ -215,6 +253,7 @@ void display() {
 		//drawLineToNearestBird(birds[i]);
 	}
 	glutSwapBuffers();
+	WaitForEndOfFrame();
 	GLenum error = glGetError();
 	if (error != GL_NO_ERROR) {
 	    cerr << "OpenGL Error: " << gluErrorString(error) << endl;
