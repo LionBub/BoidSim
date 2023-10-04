@@ -1,7 +1,9 @@
 #include <bits/types/struct_timespec.h>
 #include <bits/types/struct_timeval.h>
+#include <sys/time.h>
 #include <cstddef>
 #include <iostream>
+#include <ostream>
 #include <stdio.h>
 #include <GL/glut.h>
 #include <math.h>
@@ -9,15 +11,15 @@
 #include <string>
 #include <vector>
 #include <random>
-#include <sys/time.h>
+
 
 //complie using $ g++ -o main main.cpp -lGL -lGLU -lglut -lm
 using namespace std;
 class Bird;
-const float PI = 3.1415;
-const int FPS_LIMIT = 30;
+const float PI = 3.14159265359;
+const int FPS_LIMIT = 50;
 const float BIRDSCALE = 5.0;
-const int BIRDCOUNT = 40;
+const int BIRDCOUNT = 3;
 const float TURNING_SPEED = 2;
 const float FLOCKING_RANGE = 100.0;
 const float OBSTACLE_RANGE = 25.0;
@@ -57,6 +59,9 @@ public:
 		newrot = fmod(newrot, 360);
 		rot = newrot;
 	}
+	void setRot(float x, float y){
+		rot = atan2(y, x) * 180 / PI;
+	}
 	void addRot (float num) { setRot(rot + num); }
 	void draw(){
 		glColor3f(abs(180-rot)/360, rot/360, 0);
@@ -66,44 +71,31 @@ public:
 		x += distance * cos(rot * PI/180);//cos is in rad, rot is in degrees
 		y += distance * sin(rot * PI/180);
 	}
-	// Bird* pFindNearestBird(){ //NOT USED
-	// 	if (size(birds) > 1){
-	// 		int recordIndex;
-	// 		float recordDist;
-	// 		if (this != &birds[0]){
-	// 			recordIndex = 0;
-	// 			recordDist = distBetweenBirds(*this, birds[0]); //bird zero to bird 1
-	// 		}
-	// 		else { //If this is birds[0]
-	// 			std::cout << std::endl;
-	// 			recordIndex = 1;
-	// 			recordDist = distBetweenBirds(*this, birds[1]); //bird zero to bird 1
-	// 		}
-	// 		for(int i = 1; i < size(birds); i++){
-	// 			if (this == &birds[i]) continue;
-	// 			float thisDist = distBetweenBirds(*this, birds[i]);
-	// 			if (thisDist < recordDist) { 
-	// 				recordIndex = i;
-	// 				recordDist = thisDist; 
-	// 			}
-	// 		}
-	// 		return &birds[recordIndex];
-	// 		/* std::cout << "Bird " + std::to_string(getId()) + " to " + std::to_string(nearestBird -> getId())
-	// 			+"    at a distance of " + std::to_string(recordDist)<< std::endl; 
-	// 		*/
-	// 	}
-	// 	std::cout << "can't find nearby birds. Is there only one bird? findNearestBird() returned null" << std::endl;
-	// }
-	Bird* pGetNearestBird() { return nearbyBirds[0];}
+
+	Bird* pGetNearestBird() { 
+		if(size(nearbyBirds) > 0) return nearbyBirds[0];
+			return nullptr;
+	}
 	void findNearbyBirds() {
+		nearbyBirds.clear();
+		float recordDist = MAXFLOAT;
+		float dist = MAXFLOAT;
+
 		for(int i = 0; i < size(birds); i++){
-			if(distBetweenBirds(*this, birds[i]) < FLOCKING_RANGE){
-				nearbyBirds.insert(nearbyBirds.begin(), &birds[i]);
-			}
-			else {
-				nearbyBirds.emplace_back(&birds[i]);
+			if (this == &birds[i]) continue;
+			dist = distBetweenBirds(*this, birds[i]);
+			
+			if (dist < FLOCKING_RANGE) {
+				if(dist < recordDist){
+					recordDist = dist;
+					nearbyBirds.insert(nearbyBirds.begin(), &birds[i]);
+				}
+				else {
+					nearbyBirds.emplace_back(&birds[i]);
+				}
 			}
 		}
+		if (recordDist < FLOCKING_RANGE) cout << "dist: " << recordDist << "   winner: " << nearbyBirds[0] << endl;
 	}
 	int getId() {return id;}
 	void steerAwayFromWall() {
@@ -138,6 +130,12 @@ public:
 				break;
 		}
 	}
+	void teleportOnWall() {
+		if (x < wallx0) { x = wallx1 - 2; } //2 is just so it doesnt immediately get teleported back next frame
+		if (x > wallx1) { x = wallx0 + 2; }
+		if (y < wally0) { y = wally1 - 2; }
+		if (y > wally1) { y = wally0 + 2; }
+	}
 };
 
 int indexOfMinimumFloatArray(float *arr) {
@@ -162,8 +160,9 @@ float distBetweenBirds(Bird& a, Bird& b){ //I want this to be a pass by referenc
 }
 
 void drawLineToNearestBird(Bird& bird){ //Passing by reference. SHOULD BRD BE A POINTER??!?!
-	glColor3f(0,0,1);
 	Bird* nearBrd = bird.pGetNearestBird();
+	if(nearBrd == nullptr) return;
+	glColor3f(0,0,1);
 	glBegin(GL_LINES);
 	glVertex2f(bird.getx(), bird.gety());
 	glVertex2f(nearBrd -> getx(), nearBrd -> gety());
@@ -238,12 +237,20 @@ void display() {
 	// DRAW ALL BIRDS
 	for (int i = 0; i < size(birds); i++){
 		birds[i].step(1);
-		//birds[i].findNearbyBirds();
+		birds[i].teleportOnWall();
 		birds[i].steerAwayFromWall();
-		//birds[i].addRot(1);
+		birds[i].findNearbyBirds();
 		birds[i].draw();
-		//drawLineToNearestBird(birds[i]);
+		drawLineToNearestBird(birds[i]);
 	}
+	// 100 long line
+	glColor3f(1,0,1);
+	glBegin(GL_LINES);
+		glVertex2f(200, 200);
+		glVertex2f(200, 300);
+		glVertex2f(400, 400);
+		glVertex2f(400, 300);
+	glEnd();
 	glutSwapBuffers();
 	WaitForEndOfFrame();
 	GLenum error = glGetError();
