@@ -7,8 +7,9 @@
             "command": "g++",
             "args": [
                 "main.cpp",
+                "bird.cpp",
                 "-o",
-                "main",
+                "myprogram",
                 "-lGL",
                 "-lGLU",
                 "-lglut",

@@ -1,142 +1,12 @@
-#include <bits/types/struct_timespec.h>
-#include <bits/types/struct_timeval.h>
-#include <sys/time.h>
-#include <cstddef>
-#include <iostream>
-#include <ostream>
-#include <stdio.h>
-#include <GL/glut.h>
-#include <math.h>
-#include <cmath>
-#include <string>
-#include <vector>
-#include <random>
+//main.cpp
+#include "main.hpp"
+#include "bird.hpp"
 
+//complie using g++ -o myprogram main.cpp bird.cpp -lGL -lGLU -lglut -lm
 
-//complie using $ g++ -o main main.cpp -lGL -lGLU -lglut -lm
 using namespace std;
-class Bird;
-const float PI = 3.14159265359;
-const int FPS_LIMIT = 50;
-const float BIRDSCALE = 5.0;
-const int BIRDCOUNT = 3;
-const float TURNING_SPEED = 2;
-const float FLOCKING_RANGE = 100.0;
-const float OBSTACLE_RANGE = 25.0;
-const float wallx0 = 50.0;
-const float wallx1 = 650.0;
-const float wally0 = 50.0;
-const float wally1 = 650.0;
-int highestBirdId = 0;
-std::vector<Bird> birds; 
-void drawTriangle(float x, float y, float thetaRad);
-float distBetweenPoints(float ax, float ay, float bx, float by);
-float distBetweenBirds(Bird& a, Bird& b);
-void drawLineToNearestBird(Bird& bird);
-std::vector<Bird> createRandomBirds(int n);
-int indexOfMinimumFloatArray(float *arr);
+static const float PI = 3.14159265359;
 
-class Bird {
-private:
-	float x;
-	float y;
-	float rot;
-	int id;
-	std::vector<Bird*> nearbyBirds; /* i think this should hold pointers to save memory because 
-									I wont have multiple copies of birds in different places. All point back to the original birds vector 
-									What if I use Bird& references instead?!?!*/
-public:
-	Bird(float _x, float _y, float _rot) 
-		: x(_x), y(_y), rot(_rot) {
-			id = highestBirdId++;
-	}
-	float getx() {return x;}
-	void setx(float newx) {x = newx;}
-	float gety() {return y;}
-	void sety(float newy) {y = newy;}
-	float getRot() {return rot;}
-	void setRot(float newrot) { 
-		newrot = fmod(newrot, 360);
-		rot = newrot;
-	}
-	void setRot(float x, float y){
-		rot = atan2(y, x) * 180 / PI;
-	}
-	void addRot (float num) { setRot(rot + num); }
-	void draw(){
-		glColor3f(abs(180-rot)/360, rot/360, 0);
-		drawTriangle(x, y, rot);
-	}
-	void step(float distance){
-		x += distance * cos(rot * PI/180);//cos is in rad, rot is in degrees
-		y += distance * sin(rot * PI/180);
-	}
-
-	Bird* pGetNearestBird() { 
-		if(size(nearbyBirds) > 0) return nearbyBirds[0];
-			return nullptr;
-	}
-	void findNearbyBirds() {
-		nearbyBirds.clear();
-		float recordDist = MAXFLOAT;
-		float dist = MAXFLOAT;
-
-		for(int i = 0; i < size(birds); i++){
-			if (this == &birds[i]) continue;
-			dist = distBetweenBirds(*this, birds[i]);
-			
-			if (dist < FLOCKING_RANGE) {
-				if(dist < recordDist){
-					recordDist = dist;
-					nearbyBirds.insert(nearbyBirds.begin(), &birds[i]);
-				}
-				else {
-					nearbyBirds.emplace_back(&birds[i]);
-				}
-			}
-		}
-		if (recordDist < FLOCKING_RANGE) cout << "dist: " << recordDist << "   winner: " << nearbyBirds[0] << endl;
-	}
-	int getId() {return id;}
-	void steerAwayFromWall() {
-		float distanceToWalls[] = {x - wallx0, wally1 - y, wallx1 - x, y - wally0}; // left, top, right, bottom
-		int shortestDistanceIndex = indexOfMinimumFloatArray(distanceToWalls);
-		if (distanceToWalls[shortestDistanceIndex] > OBSTACLE_RANGE) return;
-		switch (shortestDistanceIndex) { //find which wall is closest
-		//If my point is closer to the left vertex of this edge, turn right. Else turn left
-			case 0:
-				if (distBetweenPoints(x, y, wallx0, wally0) > distBetweenPoints(x, y, wallx0, wally1)){
-					addRot(TURNING_SPEED);
-				}
-				else {addRot(-TURNING_SPEED); }
-				break;
-			case 1:
-				if (distBetweenPoints(x, y, wallx0, wally1) > distBetweenPoints(x, y, wallx1, wally1)){
-					addRot(TURNING_SPEED);
-				}
-				else {addRot(-TURNING_SPEED); }
-				break;
-			case 2:
-				if (distBetweenPoints(x, y, wallx1, wally1) > distBetweenPoints(x, y, wallx1, wally0)){
-					addRot(TURNING_SPEED);
-				}
-				else {addRot(-TURNING_SPEED); }
-				break;
-			case 3:
-				if (distBetweenPoints(x, y, wallx1, wally0) > distBetweenPoints(x, y, wallx0, wally0)){
-					addRot(TURNING_SPEED);
-				}
-				else {addRot(-TURNING_SPEED); }
-				break;
-		}
-	}
-	void teleportOnWall() {
-		if (x < wallx0) { x = wallx1 - 2; } //2 is just so it doesnt immediately get teleported back next frame
-		if (x > wallx1) { x = wallx0 + 2; }
-		if (y < wally0) { y = wally1 - 2; }
-		if (y > wally1) { y = wally0 + 2; }
-	}
-};
 
 int indexOfMinimumFloatArray(float *arr) {
 	int recordIndex = 0;
@@ -214,6 +84,7 @@ void WaitForEndOfFrame(){ //thanks chat gpt
 	}
 	last_time = this_time;
 }
+
 void display() {
 	
 	glClear(GL_COLOR_BUFFER_BIT);
