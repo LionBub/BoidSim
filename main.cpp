@@ -1,6 +1,7 @@
 //main.cpp
 #include "main.hpp"
 #include "bird.hpp"
+#include <GL/gl.h>
 
 //complie using g++ -o myprogram main.cpp bird.cpp -lGL -lGLU -lglut -lm
 
@@ -26,7 +27,7 @@ float distBetweenPoints(float ax, float ay, float bx, float by) {
 
 float distBetweenBirds(Bird& a, Bird& b){ //I want this to be a pass by reference since im not modifing the birds at all, so I do not want to make copies of them
 	//distance between two points
-	return sqrt(pow(b.getx() - a.getx(), 2) + pow(b.getx() - a.getx(),2));
+	return sqrt(pow(b.getx() - a.getx(), 2) + pow(b.gety() - a.gety(),2));
 }
 
 void drawLineToNearestBird(Bird& bird){ //Passing by reference. SHOULD BRD BE A POINTER??!?!
@@ -37,6 +38,30 @@ void drawLineToNearestBird(Bird& bird){ //Passing by reference. SHOULD BRD BE A 
 	glVertex2f(bird.getx(), bird.gety());
 	glVertex2f(nearBrd -> getx(), nearBrd -> gety());
 	glEnd();
+}
+
+void debugShowFlockingRange(Bird& bird){
+	Bird* nearestBrd = bird.pGetNearestBird();
+	for (int i = 0; i < size(birds); i++){ //birds is the list of all birds, found in bird.cpp
+		if (&bird == &birds[i]) continue;
+		if(&birds[i] == nearestBrd){
+			glColor3f(1,0,1);
+		}
+		else if (distBetweenBirds(bird, birds[i]) < FLOCKING_RANGE){
+			glColor3f(0.6,0.6,1);
+		}
+		else{
+			glColor3f(0.95,0.95,1);
+		}
+
+		glBegin(GL_LINES);
+		glVertex2f(bird.getx(), bird.gety());
+		glVertex2f(birds[i].getx(), birds[i].gety());
+		glEnd();
+
+		glColor3f(0.5,1,0.5);
+		drawHollowCircle(birds[0].getx(), birds[0].gety(), FLOCKING_RANGE);
+	}
 }
 
 std::vector<Bird> createRandomBirds(int n) { //thanks chatgpt
@@ -54,6 +79,24 @@ std::vector<Bird> createRandomBirds(int n) { //thanks chatgpt
 		birds.emplace_back(randomX, randomY, randomRot);
 	}
 	return birds;
+}
+
+void drawHollowCircle(GLfloat x, GLfloat y, GLfloat radius){
+	// https://gist.github.com/linusthe3rd/803118
+	int i;
+	int lineAmount = 16; //# of triangles used to draw circle
+	
+	//GLfloat radius = 0.8f; //radius
+	GLfloat twicePi = 2.0f * PI;
+	
+	glBegin(GL_LINE_LOOP);
+		for(i = 0; i <= lineAmount;i++) { 
+			glVertex2f(
+			    x + (radius * cos(i *  twicePi / lineAmount)), 
+			    y + (radius* sin(i * twicePi / lineAmount))
+			);
+		}
+	glEnd();
 }
 
 void WaitForEndOfFrame(){ //thanks chat gpt
@@ -107,21 +150,21 @@ void display() {
 	glEnd();
 	// DRAW ALL BIRDS
 	for (int i = 0; i < size(birds); i++){
+		Bird thisBird = birds[i];
 		birds[i].step(1);
 		birds[i].teleportOnWall();
+		birds[i].getNearbyBirds();
+		//birds[i].turnTowardsVector(-1, 0);
 		birds[i].steerAwayFromWall();
-		birds[i].findNearbyBirds();
+		if (!birds[i].risksCollision()){
+			birds[i].steerTowardsCenterOfFlock();
+			birds[i].avoidEachOther();
+
+		}
 		birds[i].draw();
-		drawLineToNearestBird(birds[i]);
+		//drawLineToNearestBird(birds[i]);
 	}
-	// 100 long line
-	glColor3f(1,0,1);
-	glBegin(GL_LINES);
-		glVertex2f(200, 200);
-		glVertex2f(200, 300);
-		glVertex2f(400, 400);
-		glVertex2f(400, 300);
-	glEnd();
+	debugShowFlockingRange(birds[0]);
 	glutSwapBuffers();
 	WaitForEndOfFrame();
 	GLenum error = glGetError();
